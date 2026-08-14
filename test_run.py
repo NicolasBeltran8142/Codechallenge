@@ -149,7 +149,7 @@ class TestProcessMove(HistoryTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_replies_with_a_move_carrying_the_game_and_turn_token(self):
         websocket = FakeWebSocket()
 
-        with patch.object(run, 'randint', return_value=3):
+        with patch('strategy.get_next_snake_move', return_value='right'):
             await run.process_move(websocket, self.your_turn())
 
         self.assertEqual(
@@ -160,7 +160,7 @@ class TestProcessMove(HistoryTestCase, unittest.IsolatedAsyncioTestCase):
                     'data': {
                         'game_id': 'g_1',
                         'turn_token': 't_1',
-                        'col': 3,
+                        'direction': 'right',
                     },
                 }
             ],
@@ -169,29 +169,19 @@ class TestProcessMove(HistoryTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_the_move_is_recorded_in_the_game_history(self):
         websocket = FakeWebSocket()
 
-        with patch.object(run, 'randint', return_value=3):
+        with patch('strategy.get_next_snake_move', return_value='right'):
             await run.process_move(websocket, self.your_turn())
 
         self.assertEqual(
             run.HISTORY['g_1'],
             ['> {"action": "move", "data": {"game_id": "g_1", '
-             '"turn_token": "t_1", "col": 3}}'],
+             '"turn_token": "t_1", "direction": "right"}}'],
         )
-
-    async def test_the_column_is_picked_from_the_width_of_the_board(self):
-        # The board is `|` delimited, so the second `|` marks the end of the
-        # first row. Documents the current bounds passed to randint.
-        websocket = FakeWebSocket()
-
-        with patch.object(run, 'randint', return_value=0) as randint:
-            await run.process_move(websocket, self.your_turn('|....|\n|....|'))
-
-        randint.assert_called_once_with(0, 4)
 
     async def test_process_your_turn_delegates_to_process_move(self):
         websocket = FakeWebSocket()
 
-        with patch.object(run, 'randint', return_value=1):
+        with patch('strategy.get_next_snake_move', return_value='up'):
             await run.process_your_turn(websocket, self.your_turn())
 
         self.assertEqual(websocket.sent[0]['action'], 'move')
@@ -224,10 +214,10 @@ class TestPlay(InTempDirTestCase, unittest.IsolatedAsyncioTestCase):
             },
         ])
 
-        with patch.object(run, 'randint', return_value=2):
+        with patch('strategy.get_next_snake_move', return_value='left'):
             await run.play(websocket)
 
-        self.assertEqual(websocket.sent[0]['data']['col'], 2)
+        self.assertEqual(websocket.sent[0]['data']['direction'], 'left')
         # Both the event and the answer end up in the history.
         self.assertEqual(len(run.HISTORY['g_1']), 2)
 
@@ -276,7 +266,7 @@ class TestPlay(InTempDirTestCase, unittest.IsolatedAsyncioTestCase):
             {'event': 'game_over', 'data': {'game_id': 'g_1'}},
         ])
 
-        with patch.object(run, 'randint', return_value=0):
+        with patch('strategy.get_next_snake_move', return_value='up'):
             await run.play(websocket)
 
         self.assertEqual(

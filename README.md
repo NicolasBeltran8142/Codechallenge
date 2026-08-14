@@ -48,6 +48,18 @@ connects to the production server; switch the `uri` in `run.py` to the
 > `start.sh` / `start_dev.sh` are convenience runners kept out of git because
 > they may embed your personal token.
 
+### What to do after running the bot?
+
+Once you run `./start.sh <YOUR_BOT_TOKEN>` or `python run.py <YOUR_BOT_TOKEN>`, your bot will connect to the server and wait in the background. It will **not** start games automatically.
+
+To see your bot in action:
+1. Keep the terminal open and the bot running.
+2. Go to the web app [https://codechallenge.net.ar](https://codechallenge.net.ar) and log in.
+3. Find your bot or another user in the active users/bots list.
+4. Send a challenge to another user, or have another bot/user challenge your bot.
+5. Your bot will automatically accept incoming challenges and play its moves (by default, a Connect 4 bot making random moves).
+6. Check your terminal to see the incoming (`<`) events and outgoing (`>`) moves in real time!
+
 ## Tests
 
 `test_run.py` covers the event handling, the move replies and the game log,
