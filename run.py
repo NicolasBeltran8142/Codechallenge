@@ -95,14 +95,17 @@ async def process_your_turn(websocket, request_data):
 
 
 async def process_move(websocket, request_data):
-    side = request_data['data']['side']
     board = request_data['data']['board']
-    colums = board.find('|', 1) - 1
     print(board)
+
+    # Pick a random direction for the Snake game
+    directions = ['up', 'down', 'left', 'right']
+    chosen_direction = directions[randint(0, 3)]
+
     move = {
         'game_id': request_data['data']['game_id'],
         'turn_token': request_data['data']['turn_token'],
-        'col': randint(0, colums),
+        'direction': chosen_direction,
     }
     log_action(move['game_id'], {'action': 'move', 'data': move})
     await send(websocket, 'move', move)
