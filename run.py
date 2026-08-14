@@ -5,6 +5,8 @@ import sys
 import websockets
 import time
 
+import strategy
+
 
 # A running text log of events received / actions sent per game, written to
 # game_<game_id>.log when the match ends.
@@ -95,14 +97,17 @@ async def process_your_turn(websocket, request_data):
 
 
 async def process_move(websocket, request_data):
-    side = request_data['data']['side']
     board = request_data['data']['board']
-    colums = board.find('|', 1) - 1
+    side = request_data['data'].get('side', 'A') # Fallback to A if not provided
     print(board)
+    
+    # Use the strategy to determine the next best move
+    chosen_direction = strategy.get_next_snake_move(board, side)
+
     move = {
         'game_id': request_data['data']['game_id'],
         'turn_token': request_data['data']['turn_token'],
-        'col': randint(0, colums),
+        'direction': chosen_direction,
     }
     log_action(move['game_id'], {'action': 'move', 'data': move})
     await send(websocket, 'move', move)

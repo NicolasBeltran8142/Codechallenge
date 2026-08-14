@@ -38,7 +38,7 @@ The server then sends events and the bot replies with actions (JSON):
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python run.py <YOUR_BOT_TOKEN>
+python run.py eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoibmljb2xhcy1tYXJjb3NiZWx0cmFuIn0.ElacNkKpd_rkAncobm7FSPd5ef77dQydOK8eYxBkBEA
 ```
 
 Get `<YOUR_BOT_TOKEN>` from **My Bots** in the web app. By default `run.py`
