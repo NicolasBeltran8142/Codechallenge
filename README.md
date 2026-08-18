@@ -11,8 +11,8 @@ Your bot authenticates with its **token** (from **My Bots** on the web) and
 opens a websocket to the server:
 
 ```
-wss://server.codechallenge.net.ar/ws?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoibmljb2xhcy1tYXJjb3NiZWx0cmFuIn0.ElacNkKpd_rkAncobm7FSPd5ef77dQydOK8eYxBkBEA                          # production
-ws://localhost:5000/ws?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoibmljb2xhcy1tYXJjb3NiZWx0cmFuIn0.ElacNkKpd_rkAncobm7FSPd5ef77dQydOK8eYxBkBEA                          # local
+wss://server.codechallenge.net.ar/ws?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiQmVsdHJhbk5pYyJ9.cX13zo89kuLZmNus43cvNnzll1MzPN6Mg9Y_uwdQgq4                          # production
+ws://localhost:5000/ws?token=                         # local
 ```
 
 The server then sends events and the bot replies with actions (JSON):
@@ -38,7 +38,7 @@ The server then sends events and the bot replies with actions (JSON):
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python run.py eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoibmljb2xhcy1tYXJjb3NiZWx0cmFuIn0.ElacNkKpd_rkAncobm7FSPd5ef77dQydOK8eYxBkBEA
+python run.py eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiQmVsdHJhbk5pYyJ9.cX13zo89kuLZmNus43cvNnzll1MzPN6Mg9Y_uwdQgq4
 ```
 
 Get `<YOUR_BOT_TOKEN>` from **My Bots** in the web app. By default `run.py`

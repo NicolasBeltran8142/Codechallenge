@@ -1,6 +1,14 @@
 import random
 
 def parse_board(board_str):
+    """
+    [TEORIA] Representación del Tablero
+    El servidor nos envía el tablero como un bloque de texto gigante. 
+    Para una computadora es difícil analizar un solo texto largo, por lo que convertimos
+    este texto en una "Grilla Bidimensional" o Matriz (una lista de listas).
+    Imagina que es como una hoja cuadriculada. Cada fila es una lista, y cada celda
+    tiene una coordenada (r, c) donde 'r' es la fila (row) y 'c' es la columna (col).
+    """
     lines = board_str.strip().split('\n')
     grid = []
     for line in lines:
@@ -12,6 +20,15 @@ def parse_board(board_str):
     return grid
 
 def find_positions(grid):
+    """
+    [TEORIA] Escaneo de la Grilla
+    Una vez que tenemos nuestra "hoja cuadriculada" (grid), la recorremos celda por celda
+    usando dos bucles (uno para filas, otro para columnas). 
+    Anotamos las coordenadas de todo lo que nos importa:
+    - 'A' y 'B': Las cabezas de las serpientes.
+    - '*': Las comidas.
+    Las posiciones se guardan como "tuplas" (r, c).
+    """
     head_a = None
     head_b = None
     foods = []
@@ -32,6 +49,12 @@ def find_positions(grid):
     return head_a, head_b, foods
 
 def is_safe(grid, r, c):
+    """
+    [TEORIA] Validación de Movimiento
+    Antes de movernos a una coordenada (r, c), debemos verificar:
+    1. Que no nos caigamos del mapa (que 'r' y 'c' estén dentro de los límites de la matriz).
+    2. Que la celda esté vacía (' ') o tenga comida ('*'). Si tiene letras, es un cuerpo y moriremos.
+    """
     rows = len(grid)
     cols = len(grid[0]) if rows > 0 else 0
     
@@ -47,6 +70,16 @@ def is_safe(grid, r, c):
     return True
 
 def flood_fill(grid, r, c):
+    """
+    [TEORIA] Algoritmo Flood Fill (Relleno por inundación)
+    Este algoritmo sirve para responder a la pregunta: "Si doy un paso hacia acá, ¿cuánto espacio libre tendré?"
+    Funciona como el balde de pintura en Paint. 
+    1. Empezamos en la casilla a la que queremos ir (r, c).
+    2. Miramos a nuestros 4 vecinos. Si están vacíos, los marcamos como "visitados" y sumamos +1 al área.
+    3. Luego miramos a los vecinos de los vecinos, y así sucesivamente (usando una cola).
+    4. Al final, nos devuelve cuántas casillas vacías están conectadas a nuestro punto de partida.
+    Esto evita que la serpiente entre en callejones sin salida (áreas muy pequeñas).
+    """
     rows = len(grid)
     cols = len(grid[0]) if rows > 0 else 0
     
@@ -76,6 +109,15 @@ def flood_fill(grid, r, c):
     return area
 
 def get_next_snake_move(board_str, side):
+    """
+    [TEORIA] El "Cerebro" de la Serpiente
+    Aquí juntamos toda la teoría para decidir el mejor movimiento:
+    1. Parseamos el tablero.
+    2. Buscamos dónde estamos y dónde está la comida.
+    3. Miramos a qué casillas inmediatas podemos movernos sin chocar (safe_moves).
+    4. Usamos Flood Fill para descartar movimientos que nos lleven a "callejones" (áreas más pequeñas que nuestra serpiente).
+    5. De los movimientos seguros restantes, usamos la "Distancia de Manhattan" para elegir el que nos acerque más a la comida.
+    """
     grid = parse_board(board_str)
     if not grid:
         return 'up'
