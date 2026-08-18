@@ -151,31 +151,26 @@ def get_next_snake_move(board_str, side):
         # Estamos completamente atrapados, solo podemos elegir al azar y morir con honor
         return random.choice(['up', 'down', 'left', 'right'])
 
-    # Paso 3: Filtrar movimientos que nos lleven a espacios muy cerrados.
-    # Si un espacio tiene menos de, digamos, 15 casillas conectadas, es probablemente un callejón mortal.
-    # Encontramos cuál es el área máxima a la que podemos acceder.
+    # [TEORIA NUEVA] Sobrevivir es más importante que comer.
+    # Antes, el bot era "goloso" y buscaba comida incluso si eso lo metía en un espacio pequeño.
+    # Ahora, buscaremos el movimiento que nos dé el MAYOR espacio libre absoluto.
     max_area = max(safe_moves.values())
 
-    # Solo consideramos movimientos que nos lleven a un área decente (evita callejones tontos)
-    # Para no ser tan estrictos, pedimos que el área sea al menos el 80% del área más grande que encontramos.
-    viable_moves = [dir for dir, area in safe_moves.items() if area >= max_area * 0.8]
+    # Obtenemos TODOS los movimientos que nos lleven a esa área máxima.
+    # Puede ser 1 solo movimiento (el único salvavidas) o varios (espacios igual de grandes).
+    best_survival_moves = [dir for dir, area in safe_moves.items() if area == max_area]
 
-    # Si de alguna forma todos son malos, volvemos a la lista completa
-    if not viable_moves:
-        viable_moves = list(safe_moves.keys())
-
-    # Paso 4: De los movimientos viables (no suicidas y no callejones), buscar la comida
-    if foods:
+    # Paso 3: Usar la comida como desempate.
+    # Solo si hay MÁS DE UN camino seguro hacia un espacio grande, nos fijamos en la comida.
+    if len(best_survival_moves) > 1 and foods:
         best_direction = None
         min_distance = float('inf')
 
-        for direction in viable_moves:
+        for direction in best_survival_moves:
             nr, nc = moves[direction]
             for fr, fc in foods:
                 # [TEORIA] Distancia de Manhattan
-                # Como en el juego no podemos movernos en diagonal, la distancia real
-                # entre dos puntos no es una línea recta. Es la suma de la distancia horizontal
-                # y la distancia vertical. ¡Como contar cuadras en una ciudad (Manhattan)!
+                # Es la suma de la distancia horizontal y la vertical.
                 dist = abs(nr - fr) + abs(nc - fc)
                 if dist < min_distance:
                     min_distance = dist
@@ -184,5 +179,5 @@ def get_next_snake_move(board_str, side):
         if best_direction:
             return best_direction
 
-    # Si no hay comida (o algo falló), elegimos uno de los movimientos viables al azar
-    return random.choice(viable_moves)
+    # Si no hay comida, o solo hay un camino que nos salva la vida, lo elegimos.
+    return random.choice(best_survival_moves)
