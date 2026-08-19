@@ -26,11 +26,14 @@ def find_positions(grid):
     usando dos bucles (uno para filas, otro para columnas).
     Anotamos las coordenadas de todo lo que nos importa:
     - 'A' y 'B': Las cabezas de las serpientes.
+    - 'a' y 'b': Los cuerpos de las serpientes (para saber qué tan largos somos).
     - '*': Las comidas.
     Las posiciones se guardan como "tuplas" (r, c).
     """
     head_a = None
     head_b = None
+    length_a = 1
+    length_b = 1
     foods = []
 
     rows = len(grid)
@@ -43,10 +46,14 @@ def find_positions(grid):
                 head_a = (r, c)
             elif cell == 'B':
                 head_b = (r, c)
+            elif cell == 'a':
+                length_a += 1
+            elif cell == 'b':
+                length_b += 1
             elif cell == '*':
                 foods.append((r, c))
 
-    return head_a, head_b, foods
+    return head_a, head_b, foods, length_a, length_b
 
 def is_safe(grid, r, c):
     """
@@ -122,10 +129,12 @@ def get_next_snake_move(board_str, side):
     if not grid:
         return 'up'
 
-    head_a, head_b, foods = find_positions(grid)
+    head_a, head_b, foods, length_a, length_b = find_positions(grid)
 
-    # Identificamos cuál es nuestra cabeza dependiendo de qué lado nos asignó el servidor
+    # Identificamos cuál es nuestra cabeza y qué tan largos somos
     my_head = head_a if side == 'A' else head_b
+    my_length = length_a if side == 'A' else length_b
+
     if not my_head:
         return random.choice(['up', 'down', 'left', 'right'])
 
@@ -151,26 +160,31 @@ def get_next_snake_move(board_str, side):
         # Estamos completamente atrapados, solo podemos elegir al azar y morir con honor
         return random.choice(['up', 'down', 'left', 'right'])
 
-    # [TEORIA NUEVA] Sobrevivir es más importante que comer.
-    # Antes, el bot era "goloso" y buscaba comida incluso si eso lo metía en un espacio pequeño.
-    # Ahora, buscaremos el movimiento que nos dé el MAYOR espacio libre absoluto.
-    max_area = max(safe_moves.values())
+    # [TEORIA] Equilibrio entre Supervivencia y Gula.
+    # Necesitamos al menos espacio equivalente a nuestro cuerpo + algo de margen para no encerrarnos.
+    # Si tenemos más de 30 casillas libres, asumimos que estamos en espacio "abierto" y seguros.
+    safe_threshold = max(my_length * 1.5, 30)
 
-    # Obtenemos TODOS los movimientos que nos lleven a esa área máxima.
-    # Puede ser 1 solo movimiento (el único salvavidas) o varios (espacios igual de grandes).
-    best_survival_moves = [dir for dir, area in safe_moves.items() if area == max_area]
+    # Todos los movimientos que nos dan espacio suficiente son considerados "excelentes".
+    excellent_moves = [dir for dir, area in safe_moves.items() if area >= safe_threshold]
 
-    # Paso 3: Usar la comida como desempate.
-    # Solo si hay MÁS DE UN camino seguro hacia un espacio grande, nos fijamos en la comida.
-    if len(best_survival_moves) > 1 and foods:
+    if not excellent_moves:
+        # Si NINGÚN movimiento es suficientemente seguro (estamos en crisis),
+        # nos olvidamos de la comida y elegimos ESTRICTAMENTE el área máxima para sobrevivir un turno más.
+        max_area = max(safe_moves.values())
+        best_survival_moves = [dir for dir, area in safe_moves.items() if area == max_area]
+        return random.choice(best_survival_moves)
+
+    # Paso 3: Somos libres. Ahora somos golosos.
+    # De entre todos los movimientos excelentes (seguros), elegimos el que nos acerque más a la comida.
+    if foods:
         best_direction = None
         min_distance = float('inf')
 
-        for direction in best_survival_moves:
+        for direction in excellent_moves:
             nr, nc = moves[direction]
             for fr, fc in foods:
                 # [TEORIA] Distancia de Manhattan
-                # Es la suma de la distancia horizontal y la vertical.
                 dist = abs(nr - fr) + abs(nc - fc)
                 if dist < min_distance:
                     min_distance = dist
@@ -179,5 +193,5 @@ def get_next_snake_move(board_str, side):
         if best_direction:
             return best_direction
 
-    # Si no hay comida, o solo hay un camino que nos salva la vida, lo elegimos.
-    return random.choice(best_survival_moves)
+    # Si no hay comida pero estamos a salvo, seguimos moviéndonos por el espacio seguro
+    return random.choice(excellent_moves)

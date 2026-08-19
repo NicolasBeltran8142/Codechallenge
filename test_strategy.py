@@ -18,14 +18,18 @@ class TestStrategy(unittest.TestCase):
 
     def test_find_positions(self):
         grid = [
-            [' ', ' ', ' '],
+            [' ', 'a', 'a'],
             [' ', 'A', '*'],
-            ['B', ' ', ' ']
+            ['B', 'b', ' ']
         ]
-        head_a, head_b, foods = strategy.find_positions(grid)
+        head_a, head_b, foods, length_a, length_b = strategy.find_positions(grid)
         self.assertEqual(head_a, (1, 1))
         self.assertEqual(head_b, (2, 0))
         self.assertEqual(foods, [(1, 2)])
+        # head + 2 bodies = 3
+        self.assertEqual(length_a, 3)
+        # head + 1 body = 2
+        self.assertEqual(length_b, 2)
 
     def test_is_safe(self):
         grid = [
@@ -71,8 +75,14 @@ class TestStrategy(unittest.TestCase):
 |   *   |
 |   A   |
 |       |
+|       |
+|       |
+|       |
+|       |
+|       |
 '''
-        # Head is at (2, 3), Food is at (1, 3). Best move is 'up'
+        # Head is at (2, 3), Food is at (1, 3). Best move is 'up'.
+        # Needs to be a bit bigger to pass the "safe threshold" (30).
         move = strategy.get_next_snake_move(board_str, 'A')
         self.assertEqual(move, 'up')
 
@@ -93,6 +103,30 @@ class TestStrategy(unittest.TestCase):
         # The flood fill for down gives > 1 (the rest of the board)
         move = strategy.get_next_snake_move(board_str, 'A')
         self.assertEqual(move, 'down')
+
+    def test_get_next_snake_move_eats_in_safe_space(self):
+        # Even if right has slightly less space than down,
+        # if both are > safe_threshold, it should prioritize the food (at right)
+        board_str = '''
+|       |
+|       |
+|       |
+|       |
+|       |
+|       |
+|       |
+|       |
+|       |
+|       |
+|       |
+|       |
+| A *   |
+| a     |
+| a     |
+'''
+        move = strategy.get_next_snake_move(board_str, 'A')
+        self.assertEqual(move, 'right')
+
 
 if __name__ == '__main__':
     unittest.main()
