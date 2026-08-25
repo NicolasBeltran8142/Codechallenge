@@ -12,7 +12,7 @@ opens a websocket to the server:
 
 ```
 wss://server.codechallenge.net.ar/ws?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiQmVsdHJhbk5pYyJ9.cX13zo89kuLZmNus43cvNnzll1MzPN6Mg9Y_uwdQgq4                          # production
-ws://localhost:5000/ws?token=                         # local
+ws://localhost:5000/ws?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiQmVsdHJhbk5pYyJ9.cX13zo89kuLZmNus43cvNnzll1MzPN6Mg9Y_uwdQgq4   # local
 ```
 
 The server then sends events and the bot replies with actions (JSON):
