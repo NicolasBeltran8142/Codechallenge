@@ -161,9 +161,9 @@ def get_next_snake_move(board_str, side):
         return random.choice(['up', 'down', 'left', 'right'])
         
     # [TEORIA] Equilibrio entre Supervivencia y Gula.
-    # Necesitamos al menos espacio equivalente a nuestro cuerpo + algo de margen para no encerrarnos.
-    # Si tenemos más de 30 casillas libres, asumimos que estamos en espacio "abierto" y seguros.
-    safe_threshold = max(my_length * 1.5, 30)
+    # Necesitamos al menos espacio equivalente a nuestro cuerpo.
+    # Eliminamos el requerimiento estricto de 30 casillas.
+    safe_threshold = my_length
     
     # Todos los movimientos que nos dan espacio suficiente son considerados "excelentes".
     excellent_moves = [dir for dir, area in safe_moves.items() if area >= safe_threshold]
@@ -175,21 +175,31 @@ def get_next_snake_move(board_str, side):
         best_survival_moves = [dir for dir, area in safe_moves.items() if area == max_area]
         return random.choice(best_survival_moves)
         
-    # Paso 3: Somos libres. Ahora somos golosos.
-    # De entre todos los movimientos excelentes (seguros), elegimos el que nos acerque más a la comida.
+    # Identificar la comida más cercana
+    closest_food = None
     if foods:
+        min_food_dist = float('inf')
+        for fr, fc in foods:
+            dist = abs(r - fr) + abs(c - fc)
+            if dist < min_food_dist:
+                min_food_dist = dist
+                closest_food = (fr, fc)
+
+    # Paso 3: Somos libres. Ahora somos golosos.
+    # De entre todos los movimientos excelentes (seguros), elegimos el que nos acerque más a la comida más cercana.
+    if closest_food:
         best_direction = None
         min_distance = float('inf')
+        fr, fc = closest_food
         
         for direction in excellent_moves:
             nr, nc = moves[direction]
-            for fr, fc in foods:
-                # [TEORIA] Distancia de Manhattan
-                dist = abs(nr - fr) + abs(nc - fc)
-                if dist < min_distance:
-                    min_distance = dist
-                    best_direction = direction
-                    
+            # [TEORIA] Distancia de Manhattan a la comida más cercana
+            dist = abs(nr - fr) + abs(nc - fc)
+            if dist < min_distance:
+                min_distance = dist
+                best_direction = direction
+
         if best_direction:
             return best_direction
 
