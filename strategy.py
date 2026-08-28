@@ -76,54 +76,77 @@ def is_safe(grid, r, c):
         
     return True
 
-def flood_fill(grid, r, c):
-    """
-    [TEORIA] Algoritmo Flood Fill (Relleno por inundación)
-    Este algoritmo sirve para responder a la pregunta: "Si doy un paso hacia acá, ¿cuánto espacio libre tendré?"
-    Funciona como el balde de pintura en Paint. 
-    1. Empezamos en la casilla a la que queremos ir (r, c).
-    2. Miramos a nuestros 4 vecinos. Si están vacíos, los marcamos como "visitados" y sumamos +1 al área.
-    3. Luego miramos a los vecinos de los vecinos, y así sucesivamente (usando una cola).
-    4. Al final, nos devuelve cuántas casillas vacías están conectadas a nuestro punto de partida.
-    Esto evita que la serpiente entre en callejones sin salida (áreas muy pequeñas).
-    """
-    rows = len(grid)
-    cols = len(grid[0]) if rows > 0 else 0
-    
-    # Si la celda inicial no es segura, el área es 0
-    if not is_safe(grid, r, c):
-        return 0
+from collections import deque
 
-    visited = set()
-    queue = [(r, c)]
-    visited.add((r, c))
-    area = 0
+def bfs_distances(grid, start_r, start_c):
+    """
+    [TEORIA] Búsqueda en Anchura (BFS - Breadth-First Search)
+    Calcula la distancia real (en cantidad de pasos) desde (start_r, start_c)
+    hasta todas las casillas alcanzables en el mapa, esquivando obstáculos.
+    Devuelve un diccionario {(r, c): distancia}.
+    """
+    if not is_safe(grid, start_r, start_c):
+        return {}
+
+    distances = {(start_r, start_c): 0}
+    queue = deque([(start_r, start_c)])
     
-    # Mientras haya casillas por revisar en nuestra cola
     while queue:
-        curr_r, curr_c = queue.pop(0)
-        area += 1
-        
-        # Revisamos los 4 vecinos de la casilla actual
+        curr_r, curr_c = queue.popleft()
+        curr_dist = distances[(curr_r, curr_c)]
+
         for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             nr, nc = curr_r + dr, curr_c + dc
-            
-            # Si el vecino no fue visitado aún y es un lugar seguro (vacío o comida)
-            if (nr, nc) not in visited and is_safe(grid, nr, nc):
-                visited.add((nr, nc))
+            if is_safe(grid, nr, nc) and (nr, nc) not in distances:
+                distances[(nr, nc)] = curr_dist + 1
                 queue.append((nr, nc))
+
+    return distances
+
+def bfs_safe_area(grid, start_r, start_c, opponent_distances):
+    """
+    [TEORIA] Control de Territorio y Área Segura
+    Calcula cuántas casillas de espacio libre real tenemos si empezamos a caminar
+    desde (start_r, start_c), pero ¡OJO! descontando las casillas a las que el
+    oponente puede llegar antes o al mismo tiempo que nosotros.
+    Esto evita que nos encierren.
+    """
+    if not is_safe(grid, start_r, start_c):
+        return 0
+
+    visited = {(start_r, start_c)}
+    queue = deque([(start_r, start_c, 1)]) # (fila, columna, nuestra_distancia_pasos)
+    area = 0
+    
+    while queue:
+        curr_r, curr_c, my_dist = queue.popleft()
+
+        # Verificamos si esta casilla está en peligro por el oponente
+        opp_dist = opponent_distances.get((curr_r, curr_c), float('inf'))
+        # Si el oponente llega antes o en el mismo turno, descartamos seguir por acá (territorio enemigo)
+        if opp_dist <= my_dist:
+            continue
+
+        area += 1
+        
+        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nr, nc = curr_r + dr, curr_c + dc
+            if is_safe(grid, nr, nc) and (nr, nc) not in visited:
+                visited.add((nr, nc))
+                queue.append((nr, nc, my_dist + 1))
                 
     return area
 
 def get_next_snake_move(board_str, side):
     """
-    [TEORIA] El "Cerebro" de la Serpiente
-    Aquí juntamos toda la teoría para decidir el mejor movimiento:
+    [TEORIA] El "Cerebro" de la Serpiente Mejorado
     1. Parseamos el tablero.
-    2. Buscamos dónde estamos y dónde está la comida.
-    3. Miramos a qué casillas inmediatas podemos movernos sin chocar (safe_moves).
-    4. Usamos Flood Fill para descartar movimientos que nos lleven a "callejones" (áreas más pequeñas que nuestra serpiente).
-    5. De los movimientos seguros restantes, usamos la "Distancia de Manhattan" para elegir el que nos acerque más a la comida.
+    2. Calculamos las distancias del oponente a todo el mapa mediante BFS.
+    3. Evaluamos nuestros movimientos seguros (inmediatos).
+    4. Para cada movimiento seguro, calculamos el "Territorio Seguro" usando BFS,
+       esquivando las zonas que el enemigo domina.
+    5. Evaluamos si el movimiento nos acerca a una comida (usando distancias BFS reales, no Manhattan),
+       siempre y cuando nos deje suficiente espacio de vida.
     """
     grid = parse_board(board_str)
     if not grid:
@@ -131,16 +154,31 @@ def get_next_snake_move(board_str, side):
         
     head_a, head_b, foods, length_a, length_b = find_positions(grid)
     
-    # Identificamos cuál es nuestra cabeza y qué tan largos somos
     my_head = head_a if side == 'A' else head_b
     my_length = length_a if side == 'A' else length_b
     
+    opp_head = head_b if side == 'A' else head_a
+
     if not my_head:
         return random.choice(['up', 'down', 'left', 'right'])
         
     r, c = my_head
     
-    # Direcciones posibles y cómo cambian nuestras coordenadas (fila, columna)
+    # Pre-calculamos qué zonas controla el oponente.
+    # Si no hay oponente en el mapa, sus distancias serán infinitas.
+    opp_distances = {}
+    if opp_head:
+        # Iniciamos un BFS falso desde los vecinos del oponente para simular su movimiento
+        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nr, nc = opp_head[0] + dr, opp_head[1] + dc
+            if is_safe(grid, nr, nc):
+                sub_dists = bfs_distances(grid, nr, nc)
+                for pos, dist in sub_dists.items():
+                    # Su distancia real es 1 (el primer paso) + la distancia desde allí
+                    actual_dist = dist + 1
+                    if pos not in opp_distances or actual_dist < opp_distances[pos]:
+                        opp_distances[pos] = actual_dist
+
     moves = {
         'up': (r - 1, c),
         'down': (r + 1, c),
@@ -148,60 +186,67 @@ def get_next_snake_move(board_str, side):
         'right': (r, c + 1)
     }
     
-    # Paso 1: Obtener movimientos que no sean chocar inmediatamente (Safe Moves)
-    safe_moves = {}
+    safe_moves_data = {}
+
     for direction, (nr, nc) in moves.items():
         if is_safe(grid, nr, nc):
-            # Paso 2: Usar Flood Fill para ver qué tan grande es el espacio si vamos por allí
-            area = flood_fill(grid, nr, nc)
-            safe_moves[direction] = area
+            # [TEORIA] Evitar Choques de Cabeza
+            # Si el movimiento es adyacente a la cabeza del oponente, es muy riesgoso
+            if opp_head and abs(nr - opp_head[0]) + abs(nc - opp_head[1]) == 1:
+                # Si somos mucho más cortos, es una muerte segura
+                # Por ahora, simplemente penalizaremos ir allí dándole área 0 si no es el último recurso
+                pass # Podemos mejorar esto luego
+
+            # Calculamos área controlada si vamos en esta dirección
+            area = bfs_safe_area(grid, nr, nc, opp_distances)
+
+            # Calculamos las distancias reales (BFS) a toda la grilla desde este paso
+            my_dists = bfs_distances(grid, nr, nc)
             
-    if not safe_moves:
-        # Estamos completamente atrapados, solo podemos elegir al azar y morir con honor
+            # Distancia a la comida más cercana
+            closest_food_dist = float('inf')
+            for fr, fc in foods:
+                if (fr, fc) in my_dists:
+                    if my_dists[(fr, fc)] < closest_food_dist:
+                        closest_food_dist = my_dists[(fr, fc)]
+
+            safe_moves_data[direction] = {
+                'area': area,
+                'food_dist': closest_food_dist
+            }
+
+    if not safe_moves_data:
+        # Pánico total
         return random.choice(['up', 'down', 'left', 'right'])
         
-    # [TEORIA] Equilibrio entre Supervivencia y Gula.
-    # Necesitamos al menos espacio equivalente a nuestro cuerpo.
-    # Eliminamos el requerimiento estricto de 30 casillas.
+    # Necesitamos un espacio mínimo para no morir enrollados.
+    # Dado que ahora el BFS descuenta zonas enemigas, seremos un poco conservadores.
     safe_threshold = my_length
     
-    # Todos los movimientos que nos dan espacio suficiente son considerados "excelentes".
-    excellent_moves = [dir for dir, area in safe_moves.items() if area >= safe_threshold]
+    excellent_moves = [d for d, data in safe_moves_data.items() if data['area'] >= safe_threshold]
     
     if not excellent_moves:
-        # Si NINGÚN movimiento es suficientemente seguro (estamos en crisis), 
-        # nos olvidamos de la comida y elegimos ESTRICTAMENTE el área máxima para sobrevivir un turno más.
-        max_area = max(safe_moves.values())
-        best_survival_moves = [dir for dir, area in safe_moves.items() if area == max_area]
-        return random.choice(best_survival_moves)
+        # Supervivencia estricta: tomar el que nos de más área libre.
+        max_area = max(data['area'] for data in safe_moves_data.values())
+        survival_moves = [d for d, data in safe_moves_data.items() if data['area'] == max_area]
+        return random.choice(survival_moves)
         
-    # Identificar la comida más cercana
-    closest_food = None
-    if foods:
-        min_food_dist = float('inf')
-        for fr, fc in foods:
-            dist = abs(r - fr) + abs(c - fc)
-            if dist < min_food_dist:
-                min_food_dist = dist
-                closest_food = (fr, fc)
+    # De los movimientos seguros, elegimos el que nos acerque más a la comida
+    best_direction = None
+    min_dist = float('inf')
 
-    # Paso 3: Somos libres. Ahora somos golosos.
-    # De entre todos los movimientos excelentes (seguros), elegimos el que nos acerque más a la comida más cercana.
-    if closest_food:
-        best_direction = None
-        min_distance = float('inf')
-        fr, fc = closest_food
+    for direction in excellent_moves:
+        data = safe_moves_data[direction]
+        if data['food_dist'] < min_dist:
+            min_dist = data['food_dist']
+            best_direction = direction
+
+    if best_direction:
+        return best_direction
         
-        for direction in excellent_moves:
-            nr, nc = moves[direction]
-            # [TEORIA] Distancia de Manhattan a la comida más cercana
-            dist = abs(nr - fr) + abs(nc - fc)
-            if dist < min_distance:
-                min_distance = dist
-                best_direction = direction
+    # Si no hay ruta a la comida pero estamos a salvo (por ej. manzanas bloqueadas por el enemigo),
+    # elegimos el que nos de mayor territorio
+    max_excellent_area = max(safe_moves_data[d]['area'] for d in excellent_moves)
+    fallback_moves = [d for d in excellent_moves if safe_moves_data[d]['area'] == max_excellent_area]
 
-        if best_direction:
-            return best_direction
-
-    # Si no hay comida pero estamos a salvo, seguimos moviéndonos por el espacio seguro
-    return random.choice(excellent_moves)
+    return random.choice(fallback_moves)
