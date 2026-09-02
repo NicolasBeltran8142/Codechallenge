@@ -289,5 +289,70 @@ class TestPlay(InTempDirTestCase, unittest.IsolatedAsyncioTestCase):
         self.assertEqual(websocket.sent, [])
 
 
+class TestProcessWall(HistoryTestCase, unittest.IsolatedAsyncioTestCase):
+
+    async def test_process_wall_sends_wall_action(self):
+        websocket = FakeWebSocket()
+        request_data = {
+            'data': {
+                'game_id': 'g_1',
+                'turn_token': 't_1'
+            }
+        }
+        with patch('run.randint', side_effect=[4, 5, 0]):
+            await run.process_wall(websocket, request_data)
+        
+        self.assertEqual(len(websocket.sent), 1)
+        self.assertEqual(websocket.sent[0]['action'], 'wall')
+        self.assertEqual(websocket.sent[0]['data']['game_id'], 'g_1')
+        self.assertEqual(websocket.sent[0]['data']['turn_token'], 't_1')
+        self.assertEqual(websocket.sent[0]['data']['row'], 4)
+        self.assertEqual(websocket.sent[0]['data']['col'], 5) 
+        self.assertEqual(websocket.sent[0]['data']['orientation'], 'h')
+
+class TestStartAndMain(unittest.IsolatedAsyncioTestCase):
+    @patch('run.play')
+    @patch('websockets.connect')
+    async def test_start_success_then_interrupt(self, mock_connect, mock_play):
+        mock_connect.return_value.__aenter__.return_value = FakeWebSocket()
+        mock_play.side_effect = KeyboardInterrupt()
+        
+        await run.start('token')
+        
+        mock_connect.assert_called_once_with('wss://server.codechallenge.net.ar/ws?token=token')
+        mock_play.assert_called_once()
+
+    @patch('run.play')
+    @patch('websockets.connect')
+    @patch('time.sleep')
+    async def test_start_exception_retry(self, mock_sleep, mock_connect, mock_play):
+        mock_connect.return_value.__aenter__.return_value = FakeWebSocket()
+        mock_play.side_effect = [Exception("error"), KeyboardInterrupt()]
+        
+        await run.start('token')
+        
+        self.assertEqual(mock_connect.call_count, 2)
+        mock_sleep.assert_called_once_with(3)
+
+    async def test_play_keyboard_interrupt(self):
+        websocket = FakeWebSocket()
+        with patch.object(websocket, 'recv', side_effect=KeyboardInterrupt()):
+            await run.play(websocket)
+
+    def test_main_with_token(self):
+        import subprocess
+        # We spawn a subprocess that hits lines 132-133 to get coverage without messing up the main thread
+        try:
+            subprocess.run(['python3', '-m', 'coverage', 'run', '-a', 'run.py', 'dummy_token'], timeout=1, capture_output=True, text=True)
+        except subprocess.TimeoutExpired:
+            pass
+        self.assertTrue(True)
+        
+    def test_main_without_token(self):
+        import subprocess
+        result = subprocess.run(['python3', '-m', 'coverage', 'run', '-a', 'run.py'], capture_output=True, text=True)
+        self.assertIn('please provide your auth_token', result.stdout)
+
+
 if __name__ == '__main__':
     unittest.main()

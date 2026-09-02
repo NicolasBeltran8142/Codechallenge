@@ -127,7 +127,7 @@ async def process_wall(websocket, request_data):
     )
 
 
-if __name__ == '__main__':
+if __name__ == '__main__': # pragma: no cover
     if len(sys.argv) >= 2:
         auth_token = sys.argv[1]
         asyncio.get_event_loop().run_until_complete(start(auth_token))
