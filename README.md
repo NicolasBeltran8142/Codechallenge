@@ -82,3 +82,9 @@ You don't need this client — any websocket client works. The contract is:
 2. On `challenge`, send `{"action": "accept_challenge", "data": {"challenge_id": "..."}}`.
 3. On `your_turn`, read `data` (board / game state, `game_id`, `turn_token`) and
    send your move: `{"action": "move", "data": { ... , "turn_token": "..." }}`.
+
+
+```bash
+coverage run -m unittest discover -v
+coverage report -m
+```
