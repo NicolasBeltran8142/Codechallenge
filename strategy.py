@@ -49,7 +49,7 @@ def find_positions(grid):
                 length_a += 1
             elif cell == 'b':
                 length_b += 1
-            elif cell == 'x':
+            elif cell in ('x', 'X'):
                 powerups.append((r, c))
             elif cell.isdigit():
                 digits[(r, c)] = int(cell)
@@ -110,7 +110,7 @@ def is_safe(grid, r, c, target_digit=None):
         return False
         
     cell = grid[r][c]
-    if cell in (' ', 'x'):
+    if cell in (' ', 'x', 'X'):
         return True
 
     if cell.isdigit():

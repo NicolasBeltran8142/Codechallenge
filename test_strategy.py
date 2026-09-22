@@ -21,7 +21,7 @@ class TestStrategy(unittest.TestCase):
         grid = [
             [' ', ' ', 'A', ' ', 'x', ' '],
             [' ', 'a', 'a', '1', 'b', 'B'],
-            ['2', 'x', ' ', ' ', '9', ' ']
+            ['2', 'X', ' ', ' ', '9', ' ']
         ]
         head_a, head_b, powerups, digits, length_a, length_b = find_positions(grid)
         self.assertEqual(head_a, (0, 2))
@@ -46,13 +46,14 @@ class TestStrategy(unittest.TestCase):
         ]
         self.assertTrue(is_safe(grid, 0, 0)) # Empty
         self.assertTrue(is_safe(grid, 0, 1)) # Powerup x
+        self.assertTrue(is_safe(grid, 1, 2)) # X obstacle -> NOW SAFE POWERUP X
         self.assertFalse(is_safe(grid, 0, 2)) # Head
 
         self.assertTrue(is_safe(grid, 1, 0, target_digit=1)) # Correct digit
         self.assertFalse(is_safe(grid, 1, 0, target_digit=2)) # Wrong digit
         self.assertFalse(is_safe(grid, 1, 1, target_digit=1)) # Wrong digit
 
-        self.assertFalse(is_safe(grid, 1, 2)) # X obstacle
+
         self.assertFalse(is_safe(grid, -1, 0)) # Out of bounds
 
     def test_bfs_distances(self):
@@ -151,7 +152,7 @@ class TestStrategy(unittest.TestCase):
         self.assertEqual(get_target_digit({(0,0): 9, (0,1): 9}), 9)
 
         # bfs_safe_area unsafe start line 160
-        area = bfs_safe_area([['X']], 0, 0, {})
+        area = bfs_safe_area([['w']], 0, 0, {})
         self.assertEqual(area, 0)
 
         # line 227 pass
