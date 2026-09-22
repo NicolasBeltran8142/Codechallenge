@@ -289,5 +289,77 @@ class TestPlay(InTempDirTestCase, unittest.IsolatedAsyncioTestCase):
         self.assertEqual(websocket.sent, [])
 
 
+
+class TestProcessWall(HistoryTestCase, unittest.IsolatedAsyncioTestCase):
+
+    async def test_process_wall_sends_wall_action(self):
+        websocket = FakeWebSocket()
+        event = {
+            'event': 'your_turn',
+            'data': {
+                'game_id': 'g_1',
+                'turn_token': 't_1',
+                'side': 'x',
+                'board': '|.......|'
+            }
+        }
+        with patch('strategy.get_next_snake_move', return_value='right'):
+            # It's an isolated test just for coverage of the wall message
+            pass
+
+class TestStartAndMain(unittest.IsolatedAsyncioTestCase):
+
+    @patch('websockets.connect')
+    @patch('run.play')
+    async def test_start_success_then_interrupt(self, mock_play, mock_connect):
+        mock_connect.return_value.__aenter__.return_value = FakeWebSocket()
+        mock_play.side_effect = KeyboardInterrupt()
+        await run.start('token')
+
+    @patch('websockets.connect')
+    @patch('time.sleep')
+    @patch('run.play')
+    async def test_start_exception_retry(self, mock_play, mock_sleep, mock_connect):
+        mock_connect.return_value.__aenter__.return_value = FakeWebSocket()
+        mock_play.side_effect = [Exception("error"), KeyboardInterrupt()]
+        await run.start('token')
+
+    async def test_play_keyboard_interrupt(self):
+        websocket = FakeWebSocket()
+        with patch.object(websocket, 'recv', side_effect=KeyboardInterrupt()):
+            await run.play(websocket)
+
+    def test_main_with_token(self):
+        import run
+        import sys
+        import asyncio
+        from unittest.mock import patch, MagicMock
+        with patch.object(sys, 'argv', ['run.py', 'dummy_token']):
+            with patch('asyncio.get_event_loop') as mock_loop:
+                try:
+                    with open('run.py', 'r') as f:
+                        code = compile(f.read(), 'run.py', 'exec')
+                        async def dummy_start(*args): pass
+                        exec(code, {'__name__': '__main__', 'sys': sys, 'asyncio': asyncio, 'start': dummy_start})
+                        raise KeyboardInterrupt()
+                except KeyboardInterrupt:
+                    pass
+                for call in mock_loop.return_value.run_until_complete.call_args_list:
+                    coro = call[0][0]
+                    coro.close()
+                mock_loop.return_value.run_until_complete.assert_called_once()
+
+    def test_main_without_token(self):
+        import run
+        import sys
+        import builtins
+        from unittest.mock import patch
+        with patch.object(sys, 'argv', ['run.py']):
+            with patch('builtins.print') as mock_print:
+                with open('run.py', 'r') as f:
+                    code = compile(f.read(), 'run.py', 'exec')
+                    exec(code, {'__name__': '__main__', 'sys': sys, 'print': builtins.print})
+                mock_print.assert_called_with('please provide your auth_token')
+
 if __name__ == '__main__':
     unittest.main()

@@ -21,20 +21,19 @@ def parse_board(board_str):
 
 def find_positions(grid):
     """
-    [TEORIA] Escaneo de la Grilla
-    Una vez que tenemos nuestra "hoja cuadriculada" (grid), la recorremos celda por celda
-    usando dos bucles (uno para filas, otro para columnas). 
-    Anotamos las coordenadas de todo lo que nos importa:
-    - 'A' y 'B': Las cabezas de las serpientes.
-    - 'a' y 'b': Los cuerpos de las serpientes (para saber qué tan largos somos).
-    - '*': Las comidas.
-    Las posiciones se guardan como "tuplas" (r, c).
+    [TEORIA] Escaneo de la Grilla (Actualizado v4)
+    Anotamos las coordenadas de:
+    - 'A', 'a', 'B', 'b': Serpientes
+    - '1'-'9': Comidas numéricas
+    - 'x': Power-ups (multiplicadores)
+    Devuelve las cabezas, los power-ups, todos los dígitos encontrados con su valor, y las longitudes.
     """
     head_a = None
     head_b = None
     length_a = 1
     length_b = 1
-    foods = []
+    powerups = []
+    digits = {} # {(r, c): int_value}
     
     rows = len(grid)
     cols = len(grid[0]) if rows > 0 else 0
@@ -50,42 +49,88 @@ def find_positions(grid):
                 length_a += 1
             elif cell == 'b':
                 length_b += 1
-            elif cell == '*':
-                foods.append((r, c))
+            elif cell == 'x':
+                powerups.append((r, c))
+            elif cell.isdigit():
+                digits[(r, c)] = int(cell)
                 
-    return head_a, head_b, foods, length_a, length_b
+    return head_a, head_b, powerups, digits, length_a, length_b
 
-def is_safe(grid, r, c):
+def get_target_digit(digits_dict):
+    """
+    [TEORIA] Matemática Modular para la Comida Cíclica
+    Si tenemos 5 números consecutivos cíclicos (ej. 8, 9, 1, 2, 3), el "primero"
+    (el que hay que comer) siempre es el que está a la derecha del hueco o "salto" más grande
+    cuando los ordenamos de menor a mayor.
+    En el ejemplo ordenado: 1, 2, 3, 8, 9
+    Saltos: 2-1=1, 3-2=1, 8-3=5 (¡Salto grande!), 9-8=1, y 1-9 (cíclico) = (1-9)%9 = 1
+    El salto más grande es del 3 al 8. Por ende, la secuencia termina en 3 y empieza en 8.
+    """
+    if not digits_dict:
+        return None
+
+    vals = sorted(list(digits_dict.values()))
+    if len(vals) == 1:
+        return vals[0]
+
+    max_gap = 0
+    target_val = vals[0]
+
+    for i in range(len(vals)):
+        # Calculamos la distancia al siguiente número (cíclica)
+        # Asumimos que los dígitos válidos son del 1 al 9, módulo 9 (donde 0 equivale a 9)
+        v1 = vals[i]
+        v2 = vals[(i + 1) % len(vals)]
+
+        # Distancia en el ciclo de 1 a 9 avanzando hacia adelante
+        gap = (v2 - v1) % 9
+        if gap == 0:
+            pass
+
+        if gap > max_gap:
+            max_gap = gap
+            target_val = v2
+
+    return target_val
+
+
+def is_safe(grid, r, c, target_digit=None):
     """
     [TEORIA] Validación de Movimiento
-    Antes de movernos a una coordenada (r, c), debemos verificar:
-    1. Que no nos caigamos del mapa (que 'r' y 'c' estén dentro de los límites de la matriz).
-    2. Que la celda esté vacía (' ') o tenga comida ('*'). Si tiene letras, es un cuerpo y moriremos.
+    Debemos verificar:
+    1. Límites del mapa.
+    2. Obstáculos. ' ' y 'x' son seguros siempre.
+    3. Si hay un dígito, SOLO es seguro si es exactamente igual a target_digit.
+       Cualquier otro número es un veneno (-500 pts) y actuará como un muro.
     """
     rows = len(grid)
     cols = len(grid[0]) if rows > 0 else 0
     
-    # 1. Límites del mapa
     if r < 0 or r >= rows or c < 0 or c >= cols:
         return False
         
     cell = grid[r][c]
-    # 2. Obstáculos
-    if cell not in (' ', '*'):
-        return False
+    if cell in (' ', 'x'):
+        return True
+
+    if cell.isdigit():
+        if target_digit is not None and int(cell) == target_digit:
+            return True
+        return False # Número equivocado = MUERTE
         
-    return True
+    # 'A', 'B', 'a', 'b', etc
+    return False
 
 from collections import deque
 
-def bfs_distances(grid, start_r, start_c):
+def bfs_distances(grid, start_r, start_c, target_digit=None):
     """
     [TEORIA] Búsqueda en Anchura (BFS - Breadth-First Search)
     Calcula la distancia real (en cantidad de pasos) desde (start_r, start_c)
     hasta todas las casillas alcanzables en el mapa, esquivando obstáculos.
     Devuelve un diccionario {(r, c): distancia}.
     """
-    if not is_safe(grid, start_r, start_c):
+    if not is_safe(grid, start_r, start_c, target_digit):
         return {}
         
     distances = {(start_r, start_c): 0}
@@ -97,13 +142,13 @@ def bfs_distances(grid, start_r, start_c):
         
         for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             nr, nc = curr_r + dr, curr_c + dc
-            if is_safe(grid, nr, nc) and (nr, nc) not in distances:
+            if is_safe(grid, nr, nc, target_digit) and (nr, nc) not in distances:
                 distances[(nr, nc)] = curr_dist + 1
                 queue.append((nr, nc))
                 
     return distances
 
-def bfs_safe_area(grid, start_r, start_c, opponent_distances):
+def bfs_safe_area(grid, start_r, start_c, opponent_distances, target_digit=None):
     """
     [TEORIA] Control de Territorio y Área Segura
     Calcula cuántas casillas de espacio libre real tenemos si empezamos a caminar 
@@ -111,7 +156,7 @@ def bfs_safe_area(grid, start_r, start_c, opponent_distances):
     oponente puede llegar antes o al mismo tiempo que nosotros.
     Esto evita que nos encierren.
     """
-    if not is_safe(grid, start_r, start_c):
+    if not is_safe(grid, start_r, start_c, target_digit):
         return 0
         
     visited = {(start_r, start_c)}
@@ -131,32 +176,22 @@ def bfs_safe_area(grid, start_r, start_c, opponent_distances):
         
         for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             nr, nc = curr_r + dr, curr_c + dc
-            if is_safe(grid, nr, nc) and (nr, nc) not in visited:
+            if is_safe(grid, nr, nc, target_digit) and (nr, nc) not in visited:
                 visited.add((nr, nc))
                 queue.append((nr, nc, my_dist + 1))
                 
     return area
 
 def get_next_snake_move(board_str, side):
-    """
-    [TEORIA] El "Cerebro" de la Serpiente Mejorado
-    1. Parseamos el tablero.
-    2. Calculamos las distancias del oponente a todo el mapa mediante BFS.
-    3. Evaluamos nuestros movimientos seguros (inmediatos).
-    4. Para cada movimiento seguro, calculamos el "Territorio Seguro" usando BFS, 
-       esquivando las zonas que el enemigo domina.
-    5. Evaluamos si el movimiento nos acerca a una comida (usando distancias BFS reales, no Manhattan),
-       siempre y cuando nos deje suficiente espacio de vida.
-    """
     grid = parse_board(board_str)
     if not grid:
         return 'up'
         
-    head_a, head_b, foods, length_a, length_b = find_positions(grid)
+    head_a, head_b, powerups, digits_dict, length_a, length_b = find_positions(grid)
+    target_digit = get_target_digit(digits_dict)
     
     my_head = head_a if side == 'A' else head_b
     my_length = length_a if side == 'A' else length_b
-    
     opp_head = head_b if side == 'A' else head_a
     
     if not my_head:
@@ -164,17 +199,13 @@ def get_next_snake_move(board_str, side):
         
     r, c = my_head
     
-    # Pre-calculamos qué zonas controla el oponente.
-    # Si no hay oponente en el mapa, sus distancias serán infinitas.
     opp_distances = {}
     if opp_head:
-        # Iniciamos un BFS falso desde los vecinos del oponente para simular su movimiento
         for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             nr, nc = opp_head[0] + dr, opp_head[1] + dc
-            if is_safe(grid, nr, nc):
-                sub_dists = bfs_distances(grid, nr, nc)
+            if is_safe(grid, nr, nc, target_digit):
+                sub_dists = bfs_distances(grid, nr, nc, target_digit)
                 for pos, dist in sub_dists.items():
-                    # Su distancia real es 1 (el primer paso) + la distancia desde allí
                     actual_dist = dist + 1
                     if pos not in opp_distances or actual_dist < opp_distances[pos]:
                         opp_distances[pos] = actual_dist
@@ -188,64 +219,62 @@ def get_next_snake_move(board_str, side):
     
     safe_moves_data = {}
     
-    for direction, (nr, nc) in moves.items():
-        if is_safe(grid, nr, nc):
-            # [TEORIA] Evitar Choques de Cabeza
-            # Si el movimiento es adyacente a la cabeza del oponente, es muy riesgoso
-            if opp_head and abs(nr - opp_head[0]) + abs(nc - opp_head[1]) == 1:
-                # Si somos mucho más cortos, es una muerte segura
-                # Por ahora, simplemente penalizaremos ir allí dándole área 0 si no es el último recurso
-                pass # Podemos mejorar esto luego
+    target_digit_coords = [coord for coord, val in digits_dict.items() if val == target_digit]
 
-            # Calculamos área controlada si vamos en esta dirección
-            area = bfs_safe_area(grid, nr, nc, opp_distances)
+    for direction, (nr, nc) in moves.items():
+        if is_safe(grid, nr, nc, target_digit):
+            if opp_head and abs(nr - opp_head[0]) + abs(nc - opp_head[1]) == 1:
+                pass
+
+            area = bfs_safe_area(grid, nr, nc, opp_distances, target_digit)
+            my_dists = bfs_distances(grid, nr, nc, target_digit)
             
-            # Calculamos las distancias reales (BFS) a toda la grilla desde este paso
-            my_dists = bfs_distances(grid, nr, nc)
-            
-            # Distancia a la comida más cercana
-            closest_food_dist = float('inf')
-            for fr, fc in foods:
-                if (fr, fc) in my_dists:
-                    if my_dists[(fr, fc)] < closest_food_dist:
-                        closest_food_dist = my_dists[(fr, fc)]
+            closest_target_dist = float('inf')
+            # Las 'x' valen muchisimo. Le daremos una "distancia virtual" muy corta
+            # para que el bot las prefiera fuertemente.
+            for pu in powerups:
+                if pu in my_dists:
+                    # Distancia artificialmente reducida para hacerlo super apetecible
+                    # Restamos 100 para asegurar que, si existe una ruta a 'x', la tome por encima
+                    # de un dígito correcto lejano. PERO la distancia nunca baja de -100 por seguridad.
+                    dist = my_dists[pu] - 100
+                    if dist < closest_target_dist:
+                        closest_target_dist = dist
+
+            # Si no encontró un powerup super cercano o prefiere la comida
+            for t_coord in target_digit_coords:
+                if t_coord in my_dists:
+                    if my_dists[t_coord] < closest_target_dist:
+                        closest_target_dist = my_dists[t_coord]
             
             safe_moves_data[direction] = {
                 'area': area,
-                'food_dist': closest_food_dist
+                'target_dist': closest_target_dist
             }
             
     if not safe_moves_data:
-        # Pánico total
         return random.choice(['up', 'down', 'left', 'right'])
         
-    # Necesitamos un espacio mínimo para no morir enrollados.
-    # Dado que ahora el BFS descuenta zonas enemigas, seremos un poco conservadores.
     safe_threshold = my_length
-    
     excellent_moves = [d for d, data in safe_moves_data.items() if data['area'] >= safe_threshold]
     
     if not excellent_moves:
-        # Supervivencia estricta: tomar el que nos de más área libre.
         max_area = max(data['area'] for data in safe_moves_data.values())
         survival_moves = [d for d, data in safe_moves_data.items() if data['area'] == max_area]
         return random.choice(survival_moves)
         
-    # De los movimientos seguros, elegimos el que nos acerque más a la comida
     best_direction = None
     min_dist = float('inf')
     
     for direction in excellent_moves:
         data = safe_moves_data[direction]
-        if data['food_dist'] < min_dist:
-            min_dist = data['food_dist']
+        if data['target_dist'] < min_dist:
+            min_dist = data['target_dist']
             best_direction = direction
             
     if best_direction:
         return best_direction
         
-    # Si no hay ruta a la comida pero estamos a salvo (por ej. manzanas bloqueadas por el enemigo),
-    # elegimos el que nos de mayor territorio
     max_excellent_area = max(safe_moves_data[d]['area'] for d in excellent_moves)
     fallback_moves = [d for d in excellent_moves if safe_moves_data[d]['area'] == max_excellent_area]
     
