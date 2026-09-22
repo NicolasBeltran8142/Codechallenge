@@ -117,7 +117,7 @@ def is_safe(grid, r, c, target_digit=None):
         if target_digit is not None and int(cell) == target_digit:
             return True
         return False # Número equivocado = MUERTE
-        
+
     # 'A', 'B', 'a', 'b', etc
     return False
 
@@ -229,19 +229,13 @@ def get_next_snake_move(board_str, side):
             area = bfs_safe_area(grid, nr, nc, opp_distances, target_digit)
             my_dists = bfs_distances(grid, nr, nc, target_digit)
             
-            closest_target_dist = float('inf')
-            # Las 'x' valen muchisimo. Le daremos una "distancia virtual" muy corta
-            # para que el bot las prefiera fuertemente.
+            closest_powerup_dist = float('inf')
             for pu in powerups:
                 if pu in my_dists:
-                    # Distancia artificialmente reducida para hacerlo super apetecible
-                    # Restamos 100 para asegurar que, si existe una ruta a 'x', la tome por encima
-                    # de un dígito correcto lejano. PERO la distancia nunca baja de -100 por seguridad.
-                    dist = my_dists[pu] - 100
-                    if dist < closest_target_dist:
-                        closest_target_dist = dist
+                    if my_dists[pu] < closest_powerup_dist:
+                        closest_powerup_dist = my_dists[pu]
 
-            # Si no encontró un powerup super cercano o prefiere la comida
+            closest_target_dist = float('inf')
             for t_coord in target_digit_coords:
                 if t_coord in my_dists:
                     if my_dists[t_coord] < closest_target_dist:
@@ -249,7 +243,8 @@ def get_next_snake_move(board_str, side):
             
             safe_moves_data[direction] = {
                 'area': area,
-                'target_dist': closest_target_dist
+                'target_dist': closest_target_dist,
+                'powerup_dist': closest_powerup_dist
             }
             
     if not safe_moves_data:
@@ -263,16 +258,29 @@ def get_next_snake_move(board_str, side):
         survival_moves = [d for d, data in safe_moves_data.items() if data['area'] == max_area]
         return random.choice(survival_moves)
         
+    # De los movimientos excelentes, buscamos si alguna dirección nos lleva a una 'x'
     best_direction = None
-    min_dist = float('inf')
+    min_powerup_dist = float('inf')
     
     for direction in excellent_moves:
         data = safe_moves_data[direction]
-        if data['target_dist'] < min_dist:
-            min_dist = data['target_dist']
+        if data['powerup_dist'] < min_powerup_dist:
+            min_powerup_dist = data['powerup_dist']
+            best_direction = direction
+
+    if best_direction and min_powerup_dist != float('inf'):
+        return best_direction
+
+    # Si no hay 'x' alcanzable, buscamos el dígito correcto
+    min_target_dist = float('inf')
+    best_direction = None
+    for direction in excellent_moves:
+        data = safe_moves_data[direction]
+        if data['target_dist'] < min_target_dist:
+            min_target_dist = data['target_dist']
             best_direction = direction
             
-    if best_direction:
+    if best_direction and min_target_dist != float('inf'):
         return best_direction
         
     max_excellent_area = max(safe_moves_data[d]['area'] for d in excellent_moves)
