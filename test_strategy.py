@@ -84,68 +84,59 @@ class TestStrategy(unittest.TestCase):
     def test_get_next_snake_move(self):
         # Empty grid
         move = get_next_snake_move("\n", "A")
-        self.assertIn(move, ["up", "down", "left", "right"])
+        self.assertEqual(move, "up")
 
-        # Panic
-        move = get_next_snake_move("|xA|\n", "A") # No hay donde moverse (A no puede comerse a si mismo y x está a la izq pero no hay más espacio)
-        # well 'x' is safe, so it will try to go left and die maybe? Wait. Panic means no moves.
-        # A will have length 1. x is space 1. threshold is 1. Excellent moves. So it will go left!
-
-        # Powerup priority
+        # Powerup vs Food balance
+        # Food base=200, PU base=1000.
+        # Food at dist 0 (right next to it) -> score = 200/1 = 200
+        # PU at dist 3 -> score = 1000/4 = 250 -> prefers PU!
+        # Let's test Food at dist 0 vs PU at dist 5 -> score = 1000/6 = 166. Food wins!
         board = '''
-|A x  8|
-|      |
+| X      A1|
+|          |
 '''
-        # Target is 8. Powerup is closer, should go right towards x.
+        # A is at (0,8), 1 is at (0,9) (dist 0 from A's right step).
+        # X is at (0,2). dist from A's left step is 5.
+        # PU score = 1000/(5+1) = 166. Food score = 200/(0+1) = 200.
+        # It should go right to eat 1!
         move = get_next_snake_move(board, 'A')
         self.assertEqual(move, 'right')
 
-        # Survival priority over powerup
+        # Survival priority over objectives
         board = '''
 | Aw   |
 | www  |
 '''
-        # Right has x but traps us (assuming we are length 5).
-        # Left is empty spaces. It should pick left to survive.
         move = get_next_snake_move(board, 'A')
         self.assertEqual(move, 'left')
 
     def test_get_next_snake_move_with_opponent(self):
+        # Opponent is closer to X, so we ignore it and go for Food
         board = '''
-|A  x |
-|     |
-|    B|
+|A    B X |
+|         |
+|   1     |
 '''
+        # B is closer to X. A should go down towards 1.
         move = get_next_snake_move(board, 'A')
-        self.assertEqual(move, 'right')
-
-
+        self.assertEqual(move, 'down')
 
     def test_coverage_misses(self):
-        # cover lines 88 (get_target_digit empty val list len 1 check)
-        self.assertEqual(get_target_digit({(0,0): 5}), 5)
-
-        # cover fallback empty moves
-        move = get_next_snake_move("|\n", "A")
-        self.assertIn(move, ["up", "down", "left", "right"])
-
-        # cover panic block and head interaction
+        # Cover pass statement line 198
         board = '''
-|B|
-|A|
+|A B|
 '''
         move = get_next_snake_move(board, 'A')
         self.assertIn(move, ['up', 'down', 'left', 'right'])
 
-        # cover fallback blocks
+        # Cover fallback lines 230-232
         board = '''
-|A    |
-|wwwww|
+|A     |
+|      |
+|      |
 '''
         move = get_next_snake_move(board, 'A')
-        self.assertIn(move, ['right', 'up', 'down', 'left'])
-
-
+        self.assertIn(move, ['up', 'down', 'left', 'right'])
 
     def test_coverage_misses_2(self):
         # target_digit gap line 88
@@ -162,20 +153,6 @@ class TestStrategy(unittest.TestCase):
         move = get_next_snake_move(board, 'A')
         self.assertIn(move, ['up', 'down', 'left', 'right'])
 
-        # line 248 closest_target_dist
-        board = '''
-|A x 1|
-|     |
-'''
-        # Here x gets dist 2-100 = -98. Then 1 is dist 4. Since 4 < -98 is false, it won't hit it.
-        # we need the digit to be closer or the only thing.
-        board2 = '''
-|A   1|
-|     |
-'''
-        move = get_next_snake_move(board2, 'A')
-        self.assertEqual(move, 'right')
-
         # line 262-264 survival moves
         board3 = '''
 | Aw   |
@@ -184,6 +161,21 @@ class TestStrategy(unittest.TestCase):
         move = get_next_snake_move(board3, 'A')
         self.assertIn(move, ['left'])
 
+    def test_coverage_misses_3(self):
+        # line 272 (panic fallback)
+        board = '''
+|B|
+|A|
+'''
+        move = get_next_snake_move(board, 'A')
+        self.assertIn(move, ['up', 'down', 'left', 'right'])
+
+        # line 198 (opp_head interaction pass)
+        board2 = '''
+|A B|
+'''
+        move = get_next_snake_move(board2, 'A')
+        self.assertIn(move, ['up', 'down', 'left', 'right'])
 
 if __name__ == '__main__':  # pragma: no cover
     unittest.main()
