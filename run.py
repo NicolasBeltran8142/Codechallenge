@@ -99,10 +99,17 @@ async def process_your_turn(websocket, request_data):
 async def process_move(websocket, request_data):
     board = request_data['data']['board']
     side = request_data['data'].get('side', 'A') # Fallback to A if not provided
+    
+    multiplier = 1
+    if side == 'A':
+        multiplier = request_data['data'].get('multiplier_1', 1)
+    else:
+        multiplier = request_data['data'].get('multiplier_2', 1)
+
     print(board)
     
     # Use the strategy to determine the next best move
-    chosen_direction = strategy.get_next_snake_move(board, side)
+    chosen_direction = strategy.get_next_snake_move(board, side, multiplier)
 
     move = {
         'game_id': request_data['data']['game_id'],

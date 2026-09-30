@@ -69,7 +69,8 @@ def get_target_digit(digits_dict):
     if not digits_dict:
         return None
         
-    vals = sorted(list(digits_dict.values()))
+    # En la regla v6 hay múltiples copias, por lo que convertimos a set para ordenarlos únicos
+    vals = sorted(list(set(digits_dict.values())))
     if len(vals) == 1:
         return vals[0]
         
@@ -77,7 +78,7 @@ def get_target_digit(digits_dict):
     target_val = vals[0]
     
     for i in range(len(vals)):
-        # Calculamos la distancia al siguiente número (cíclica)
+        # Calculamos la distancia al siguiente número único (cíclica)
         # Asumimos que los dígitos válidos son del 1 al 9, módulo 9 (donde 0 equivale a 9)
         v1 = vals[i]
         v2 = vals[(i + 1) % len(vals)]
@@ -102,6 +103,7 @@ def is_safe(grid, r, c, target_digit=None):
     2. Obstáculos. ' ' y 'x' son seguros siempre.
     3. Si hay un dígito, SOLO es seguro si es exactamente igual a target_digit.
        Cualquier otro número es un veneno (-500 pts) y actuará como un muro.
+    4. Los muros '#' también son obstáculos (regla v5).
     """
     rows = len(grid)
     cols = len(grid[0]) if rows > 0 else 0
@@ -113,6 +115,9 @@ def is_safe(grid, r, c, target_digit=None):
     if cell in (' ', 'x', 'X'):
         return True
         
+    if cell == '#':
+        return False # Muro de regla v5 = PELIGRO
+
     if cell.isdigit():
         if target_digit is not None and int(cell) == target_digit:
             return True
@@ -182,7 +187,7 @@ def bfs_safe_area(grid, start_r, start_c, opponent_distances, target_digit=None)
                 
     return area
 
-def get_next_snake_move(board_str, side):
+def get_next_snake_move(board_str, side, multiplier=1):
     grid = parse_board(board_str)
     if not grid:
         return 'up'
@@ -193,6 +198,7 @@ def get_next_snake_move(board_str, side):
     my_head = head_a if side == 'A' else head_b
     my_length = length_a if side == 'A' else length_b
     opp_head = head_b if side == 'A' else head_a
+    opp_length = length_b if side == 'A' else length_a
     
     if not my_head:
         return random.choice(['up', 'down', 'left', 'right'])
@@ -218,33 +224,77 @@ def get_next_snake_move(board_str, side):
     }
     
     safe_moves_data = {}
-    
     target_digit_coords = [coord for coord, val in digits_dict.items() if val == target_digit]
+    
+    # Pre-evaluación de objetivos competitivos
+    # Determinamos qué objetivos son "nuestros" (llegamos antes o igual que el rival)
+    # y calculamos un "deseo" general para cada objetivo
     
     for direction, (nr, nc) in moves.items():
         if is_safe(grid, nr, nc, target_digit):
+            penalty = 0
             if opp_head and abs(nr - opp_head[0]) + abs(nc - opp_head[1]) == 1:
-                pass
+                # Si el oponente es más grande o igual, un choque de cabezas nos matará o empatará. Evitar si es posible.
+                if opp_length >= my_length:
+                    penalty += 5000 # Penalización masiva por riesgo de choque de cabezas
+
+            # Penalización por moverse cerca de muros '#' (para evitar ser aplastados)
+            # Chequeamos si hay muros adyacentes
+            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                wr, wc = nr + dr, nc + dc
+                if 0 <= wr < len(grid) and 0 <= wc < len(grid[0]) and grid[wr][wc] == '#':
+                    penalty += 100 # Pequeña penalización por estar al lado de un muro que se encoge
                 
             area = bfs_safe_area(grid, nr, nc, opp_distances, target_digit)
             my_dists = bfs_distances(grid, nr, nc, target_digit)
             
-            closest_powerup_dist = float('inf')
+            # Evaluación equilibrada de objetivos
+            best_obj_score = -float('inf')
+            
+            # Evaluamos Powerups (X)
+            # Valor base para priorizar, diluido por la distancia.
+            # Si ya tenemos un multiplicador alto, los powerups adicionales valen un poco menos en relación a la comida.
+            powerup_base_value = 1000.0 / max(1, (multiplier * 0.5)) 
             for pu in powerups:
                 if pu in my_dists:
-                    if my_dists[pu] < closest_powerup_dist:
-                        closest_powerup_dist = my_dists[pu]
-                        
-            closest_target_dist = float('inf')
+                    my_dist_to_pu = my_dists[pu]
+                    opp_dist_to_pu = opp_distances.get(pu, float('inf'))
+                    
+                    # Solo lo deseamos si llegamos antes o al mismo tiempo (competimos)
+                    if my_dist_to_pu <= opp_dist_to_pu:
+                        # Puntuación = valor / (distancia + 1)
+                        score = powerup_base_value / (my_dist_to_pu + 1)
+                        if score > best_obj_score:
+                            best_obj_score = score
+                            
+            # Evaluamos Comida Regular (Dígito Correcto)
+            # La comida se escala directamente con el multiplicador que ya tenemos.
+            food_base_value = 200.0 * multiplier
+            
+            # En v6, el oponente puede comer CUALQUIER copia del dígito y todas desaparecen.
+            # Calculamos la distancia mínima del oponente a CUALQUIER copia del target_digit.
+            min_opp_dist_to_any_food = float('inf')
+            for t_coord in target_digit_coords:
+                if t_coord in opp_distances:
+                    min_opp_dist_to_any_food = min(min_opp_dist_to_any_food, opp_distances[t_coord])
+
             for t_coord in target_digit_coords:
                 if t_coord in my_dists:
-                    if my_dists[t_coord] < closest_target_dist:
-                        closest_target_dist = my_dists[t_coord]
+                    my_dist_to_food = my_dists[t_coord]
+                    
+                    # Comparamos nuestra distancia a esta copia vs. la distancia del oponente a la copia MAS CERCANA a él.
+                    # Si él llega a su copia antes de que nosotros a la nuestra, abandonamos este objetivo, porque lo robará.
+                    if my_dist_to_food <= min_opp_dist_to_any_food:
+                        score = food_base_value / (my_dist_to_food + 1)
+                        if score > best_obj_score:
+                            best_obj_score = score
             
+            # Aplicar la penalización de peligro al obj_score
+            final_score = best_obj_score - penalty if best_obj_score != -float('inf') else -penalty
+
             safe_moves_data[direction] = {
                 'area': area,
-                'target_dist': closest_target_dist,
-                'powerup_dist': closest_powerup_dist
+                'obj_score': final_score
             }
             
     if not safe_moves_data:
@@ -258,31 +308,20 @@ def get_next_snake_move(board_str, side):
         survival_moves = [d for d, data in safe_moves_data.items() if data['area'] == max_area]
         return random.choice(survival_moves)
         
-    # De los movimientos excelentes, buscamos si alguna dirección nos lleva a una 'x'
+    # Elegimos el movimiento excelente que nos lleve al objetivo con mayor puntuación
     best_direction = None
-    min_powerup_dist = float('inf')
+    max_score = -float('inf')
     
     for direction in excellent_moves:
         data = safe_moves_data[direction]
-        if data['powerup_dist'] < min_powerup_dist:
-            min_powerup_dist = data['powerup_dist']
+        if data['obj_score'] > max_score:
+            max_score = data['obj_score']
             best_direction = direction
             
-    if best_direction and min_powerup_dist != float('inf'):
+    if best_direction and max_score > -float('inf'):
         return best_direction
         
-    # Si no hay 'x' alcanzable, buscamos el dígito correcto
-    min_target_dist = float('inf')
-    best_direction = None
-    for direction in excellent_moves:
-        data = safe_moves_data[direction]
-        if data['target_dist'] < min_target_dist:
-            min_target_dist = data['target_dist']
-            best_direction = direction
-            
-    if best_direction and min_target_dist != float('inf'):
-        return best_direction
-        
+    # Si no hay rutas a ningún objetivo que podamos ganar, elegimos el que dé más área libre (supervivencia pasiva)
     max_excellent_area = max(safe_moves_data[d]['area'] for d in excellent_moves)
     fallback_moves = [d for d in excellent_moves if safe_moves_data[d]['area'] == max_excellent_area]
     
