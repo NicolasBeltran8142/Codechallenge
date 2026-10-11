@@ -356,3 +356,40 @@ class TestStartAndMain(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class TestYourTurnMultiplier(unittest.IsolatedAsyncioTestCase):
+    async def test_your_turn_side_b(self):
+        from run import process_your_turn
+        from test_run import FakeWebSocket
+        websocket = FakeWebSocket([])
+        data = {
+            'event': 'your_turn',
+            'data': {
+                'game_id': 'g_1',
+                'turn_token': 't_1',
+                'side': 'B',
+                'board': '|.......|',
+                'multiplier_2': 5
+            },
+        }
+        with patch('strategy.get_next_snake_move', return_value='up'):
+            await process_your_turn(websocket, data)
+        self.assertEqual(websocket.sent[0]['action'], 'move')
+
+    async def test_your_turn_side_a(self):
+        from run import process_your_turn
+        from test_run import FakeWebSocket
+        websocket = FakeWebSocket([])
+        data = {
+            'event': 'your_turn',
+            'data': {
+                'game_id': 'g_1',
+                'turn_token': 't_1',
+                'side': 'A',
+                'board': '|.......|',
+                'multiplier_1': 5
+            },
+        }
+        with patch('strategy.get_next_snake_move', return_value='up'):
+            await process_your_turn(websocket, data)
+        self.assertEqual(websocket.sent[0]['action'], 'move')

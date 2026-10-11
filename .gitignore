@@ -3,6 +3,13 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Archivos de datos y reportes de Coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+
 # C extensions
 *.so
 
@@ -133,3 +140,4 @@ start_dev.sh
 
 # game logs written at the end of each match
 game_*.log
+.coveragerc

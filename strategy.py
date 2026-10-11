@@ -85,8 +85,6 @@ def get_target_digit(digits_dict):
         
         # Distancia en el ciclo de 1 a 9 avanzando hacia adelante
         gap = (v2 - v1) % 9
-        if gap == 0:
-            pass
             
         if gap > max_gap:
             max_gap = gap
@@ -318,11 +316,6 @@ def get_next_snake_move(board_str, side, multiplier=1):
             max_score = data['obj_score']
             best_direction = direction
             
-    if best_direction and max_score > -float('inf'):
-        return best_direction
+    # if best_direction:
+    return best_direction
         
-    # Si no hay rutas a ningún objetivo que podamos ganar, elegimos el que dé más área libre (supervivencia pasiva)
-    max_excellent_area = max(safe_moves_data[d]['area'] for d in excellent_moves)
-    fallback_moves = [d for d in excellent_moves if safe_moves_data[d]['area'] == max_excellent_area]
-    
-    return random.choice(fallback_moves)

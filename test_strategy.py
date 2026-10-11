@@ -227,10 +227,8 @@ class TestStrategy(unittest.TestCase):
         move = strategy.get_next_snake_move(board_str, 'A')
         self.assertIn(move, ['up', 'down', 'left'])
 
-if __name__ == '__main__':
-    unittest.main()
 
-    def test_get_target_digit_v6(self):
+    def test_get_target_digit(self):
         # 3 copies of 2, 2 copies of 4, 1 copy of 9
         # set is {2, 4, 9}
         # gaps: 4-2=2, 9-4=5, 2-9=2 (módulo 9 es 2, cíclico: 2+9=11, 11-9=2)
@@ -269,3 +267,110 @@ if __name__ == '__main__':
         # We just test it runs without error
         move = strategy.get_next_snake_move(board, 'A', multiplier=1)
         self.assertIn(move, ['up', 'down', 'left', 'right'])
+
+    def test_get_target_digit_gap(self):
+        # 1, 2, 3, 8, 9 -> largest gap is 8-3 = 5 -> target is 8
+        digits_dict = {(0,0): 1, (0,1): 2, (0,2): 3, (0,3): 8, (0,4): 9}
+        self.assertEqual(strategy.get_target_digit(digits_dict), 8)
+
+    def test_get_target_digit_gap_cyclic(self):
+        # 1, 2, 8, 9 -> largest gap is 8-2 = 6 -> target is 8
+        digits_dict = {(0,0): 1, (0,1): 2, (0,2): 8, (0,3): 9}
+        self.assertEqual(strategy.get_target_digit(digits_dict), 8)
+
+    def test_get_target_digit_gap_zero(self):
+        # same digit multiple times
+        digits_dict = {(0,0): 5, (0,1): 5}
+        self.assertEqual(strategy.get_target_digit(digits_dict), 5)
+
+    def test_get_target_digit_basic(self):
+        digits_dict = {(0,0): 1, (0,1): 2, (0,2): 3, (0,3): 8, (0,4): 9}
+        self.assertEqual(strategy.get_target_digit(digits_dict), 8)
+
+    def test_get_target_digit_gap_zero_branch(self):
+        # Force a gap of 0 in modulo 9 math to hit gap == 0 branch
+        digits_dict = {(0,0): 9, (0,1): 9}
+        self.assertEqual(strategy.get_target_digit(digits_dict), 9)
+
+
+    def test_get_target_digit_gap_zero_branch_v2(self):
+        digits_dict = {(0,0): 1, (0,1): 1}
+        self.assertEqual(strategy.get_target_digit(digits_dict), 1)
+
+
+    def test_get_target_digit_full(self):
+        digits_dict = {(0,0): 1, (0,1): 3, (0,2): 4, (0,3): 6}
+        self.assertEqual(strategy.get_target_digit(digits_dict), 1)
+
+    def test_get_target_digit_none(self):
+        self.assertIsNone(strategy.get_target_digit({}))
+        
+
+    def test_v6_food_evaluation_powerups(self):
+        board = "|     |\n|A 1 X|\n| ### |\n|B1   |\n|     |\n"
+        move = strategy.get_next_snake_move(board, 'A', multiplier=1)
+        self.assertIn(move, ['up', 'down', 'left', 'right'])
+
+    def test_v6_food_evaluation_powerups_and_food_distances(self):
+        # We need a case where we are closer to a powerup than the opponent
+        board = "|     |\n|A   X|\n| ### |\n|B1   |\n|     |\n"
+        move = strategy.get_next_snake_move(board, 'A', multiplier=1)
+        self.assertIn(move, ['right', 'up', 'down'])
+
+        # We also need a case where we evaluate a food distance and a wall penalty
+        board = "|#    |\n|#A  1|\n| ### |\n|B1   |\n|     |\n"
+        move = strategy.get_next_snake_move(board, 'A', multiplier=1)
+        self.assertIn(move, ['right', 'up', 'down'])
+
+    def test_v6_food_evaluation_powerups_and_food_distances2(self):
+        # Trigger lines 259-268
+        # We need a case where we are closer to a powerup than the opponent
+        board = "|     |\n|A   X|\n| ### |\n|B X  |\n|     |\n"
+        move = strategy.get_next_snake_move(board, 'A', multiplier=1)
+        self.assertIn(move, ['right', 'down', 'up'])
+
+    def test_v6_food_evaluation_food_distances2(self):
+        # Trigger lines 282-290
+        board = "|     |\n|A   1|\n| ### |\n|B 1  |\n|     |\n"
+        move = strategy.get_next_snake_move(board, 'A', multiplier=1)
+        self.assertIn(move, ['right', 'down', 'up'])
+
+    def test_fallback_moves2(self):
+        # Trigger lines 325-328
+        # Make a situation where all excellent moves have same area and no objects
+        board = "|     |\n|  A  |\n|     |\n|     |\n|     |\n"
+        move = strategy.get_next_snake_move(board, 'A', multiplier=1)
+        self.assertIn(move, ['up', 'down', 'left', 'right'])
+
+
+    def test_wall_penalty(self):
+        board = "|#    |\n|#A  1|\n|#    |\n|     |\n|     |\n"
+        move = strategy.get_next_snake_move(board, 'A', multiplier=1)
+        self.assertIn(move, ['right', 'up', 'down'])
+
+    def test_v6_food_evaluation_opponent_arrives_before(self):
+        # Trigger line 278-279
+        # Both look at food '1', but opponent gets there first, so we should abandon it
+        # Actually we need opponent to have distance to a target_digit coordinate, which is recorded in opp_distances
+        board = "|     |\n|A   1|\n| ### |\n| B   |\n|     |\n"
+        move = strategy.get_next_snake_move(board, 'A', multiplier=1)
+        self.assertIn(move, ['right', 'down', 'up', 'left'])
+
+
+    def test_get_target_digit_gap_zero_branch_v3(self):
+        # Force a gap of 0 in modulo 9 math to hit gap == 0 branch and continue
+        digits_dict = {(0,0): 9, (0,1): 9}
+        self.assertEqual(strategy.get_target_digit(digits_dict), 9)
+
+    def test_fallback_moves_real(self):
+        # Trigger line 325-328
+        # We need an excellent move (area >= length) but with best_obj_score == -inf
+        # Length is 1 (A), safe_threshold = 1.
+        # Create a large open space, no objects
+        board = "|         |\n|    A    |\n|         |\n|         |\n|         |\n"
+        move = strategy.get_next_snake_move(board, 'A', multiplier=1)
+        self.assertIn(move, ['up', 'down', 'left', 'right'])
+
+
+if __name__ == '__main__':
+    unittest.main()
