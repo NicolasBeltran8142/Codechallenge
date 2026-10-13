@@ -21,40 +21,51 @@ class TestStrategy(unittest.TestCase):
         grid = [
             ['A', 'a', 'a'],
             [' ', 'B', 'b'],
-            ['x', ' ', '1']
+            ['x', ' ', '1'],
+            ['Ⓐ', 'Ⓑ', ' ']
         ]
-        head_a, head_b, powerups, digits_dict, length_a, length_b = strategy.find_positions(grid)
+        head_a, head_b, powerups, digits_dict, length_a, length_b, tf_a, tf_b = strategy.find_positions(grid)
         self.assertEqual(head_a, (0, 0))
         self.assertEqual(head_b, (1, 1))
         self.assertEqual(powerups, [(2, 0)])
         self.assertEqual(digits_dict, {(2, 2): 1})
         self.assertEqual(length_a, 3) # Head + 2 'a'
         self.assertEqual(length_b, 2) # Head + 1 'b'
+        self.assertEqual(tf_a, [(3, 0)])
+        self.assertEqual(tf_b, [(3, 1)])
         
         # Empty grid
-        head_a, head_b, powerups, digits_dict, length_a, length_b = strategy.find_positions([])
+        head_a, head_b, powerups, digits_dict, length_a, length_b, tf_a, tf_b = strategy.find_positions([])
         self.assertIsNone(head_a)
         self.assertIsNone(head_b)
         self.assertEqual(powerups, [])
         self.assertEqual(digits_dict, {})
+        self.assertEqual(tf_a, [])
+        self.assertEqual(tf_b, [])
 
     def test_is_safe(self):
         grid = [
-            [' ', 'x'],
-            ['A', 'a'],
-            ['#', '2']
+            [' ', 'x', 'Ⓐ'],
+            ['A', 'a', 'Ⓑ'],
+            ['#', '2', ' ']
         ]
         self.assertTrue(strategy.is_safe(grid, 0, 0))
         self.assertTrue(strategy.is_safe(grid, 0, 1))
         self.assertFalse(strategy.is_safe(grid, 1, 0))
         self.assertFalse(strategy.is_safe(grid, 1, 1))
         self.assertFalse(strategy.is_safe(grid, 2, 0)) # # wall
-        self.assertTrue(strategy.is_safe(grid, 2, 1, 2)) # correct digit
-        self.assertFalse(strategy.is_safe(grid, 2, 1, 3)) # incorrect digit
+        self.assertTrue(strategy.is_safe(grid, 2, 1, side=None, target_digit=2)) # correct digit
+        self.assertFalse(strategy.is_safe(grid, 2, 1, side=None, target_digit=3)) # incorrect digit
         # Bounds check
         self.assertFalse(strategy.is_safe(grid, -1, 0))
-        self.assertFalse(strategy.is_safe(grid, 0, 2))
+        self.assertFalse(strategy.is_safe(grid, 0, 2)) # Ⓐ is false if side=None
         self.assertFalse(strategy.is_safe(grid, 3, 0))
+        
+        # V7 Tail food check
+        self.assertFalse(strategy.is_safe(grid, 0, 2, side='A')) # Ⓐ is not safe for A
+        self.assertTrue(strategy.is_safe(grid, 1, 2, side='A')) # Ⓑ is safe for A
+        self.assertTrue(strategy.is_safe(grid, 0, 2, side='B')) # Ⓐ is safe for B
+        self.assertFalse(strategy.is_safe(grid, 1, 2, side='B')) # Ⓑ is not safe for B
         
         # Empty grid
         self.assertFalse(strategy.is_safe([], 0, 0))
@@ -65,7 +76,7 @@ class TestStrategy(unittest.TestCase):
             [' ', 'A', ' '],
             ['1', ' ', ' ']
         ]
-        dist = strategy.bfs_distances(grid, 0, 0, 1)
+        dist = strategy.bfs_distances(grid, 0, 0, side='A', target_digit=1)
         self.assertEqual(dist[(0, 0)], 0)
         self.assertEqual(dist[(0, 1)], 1)
         self.assertEqual(dist[(0, 2)], 2)
@@ -334,6 +345,17 @@ class TestStrategy(unittest.TestCase):
         board = "|     |\n|A   1|\n| ### |\n|B 1  |\n|     |\n"
         move = strategy.get_next_snake_move(board, 'A', multiplier=1)
         self.assertIn(move, ['right', 'down', 'up'])
+
+    def test_v7_tail_food_evaluation(self):
+        # Test that AI will go for opponent tail food if safe and close
+        board = "|     |\n|A Ⓑ  |\n|     |\n|B    |\n|     |\n"
+        move = strategy.get_next_snake_move(board, 'A', multiplier=1)
+        self.assertIn(move, ['right'])
+        
+        # Test that B will go for A's tail food
+        board = "|     |\n|     |\n|     |\n|B Ⓐ  |\n|     |\n"
+        move = strategy.get_next_snake_move(board, 'B', multiplier=1)
+        self.assertIn(move, ['right'])
 
     def test_fallback_moves2(self):
         # Trigger lines 325-328

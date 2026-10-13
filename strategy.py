@@ -21,12 +21,13 @@ def parse_board(board_str):
 
 def find_positions(grid):
     """
-    [TEORIA] Escaneo de la Grilla (Actualizado v4)
+    [TEORIA] Escaneo de la Grilla (Actualizado v7)
     Anotamos las coordenadas de:
     - 'A', 'a', 'B', 'b': Serpientes
     - '1'-'9': Comidas numéricas
     - 'x': Power-ups (multiplicadores)
-    Devuelve las cabezas, los power-ups, todos los dígitos encontrados con su valor, y las longitudes.
+    - 'Ⓐ', 'Ⓑ': Comida de cola (v7)
+    Devuelve las cabezas, los power-ups, todos los dígitos encontrados con su valor, las longitudes y las comidas de cola.
     """
     head_a = None
     head_b = None
@@ -34,6 +35,8 @@ def find_positions(grid):
     length_b = 1
     powerups = []
     digits = {} # {(r, c): int_value}
+    tail_food_a = []
+    tail_food_b = []
     
     rows = len(grid)
     cols = len(grid[0]) if rows > 0 else 0
@@ -51,10 +54,14 @@ def find_positions(grid):
                 length_b += 1
             elif cell in ('x', 'X'):
                 powerups.append((r, c))
+            elif cell == 'Ⓐ':
+                tail_food_a.append((r, c))
+            elif cell == 'Ⓑ':
+                tail_food_b.append((r, c))
             elif cell.isdigit():
                 digits[(r, c)] = int(cell)
                 
-    return head_a, head_b, powerups, digits, length_a, length_b
+    return head_a, head_b, powerups, digits, length_a, length_b, tail_food_a, tail_food_b
 
 def get_target_digit(digits_dict):
     """
@@ -93,7 +100,7 @@ def get_target_digit(digits_dict):
     return target_val
 
 
-def is_safe(grid, r, c, target_digit=None):
+def is_safe(grid, r, c, side=None, target_digit=None):
     """
     [TEORIA] Validación de Movimiento
     Debemos verificar:
@@ -102,6 +109,7 @@ def is_safe(grid, r, c, target_digit=None):
     3. Si hay un dígito, SOLO es seguro si es exactamente igual a target_digit.
        Cualquier otro número es un veneno (-500 pts) y actuará como un muro.
     4. Los muros '#' también son obstáculos (regla v5).
+    5. La comida de cola del oponente (v7) es segura. La nuestra no.
     """
     rows = len(grid)
     cols = len(grid[0]) if rows > 0 else 0
@@ -121,19 +129,24 @@ def is_safe(grid, r, c, target_digit=None):
             return True
         return False # Número equivocado = MUERTE
         
-    # 'A', 'B', 'a', 'b', etc
+    if side == 'A' and cell == 'Ⓑ':
+        return True
+    if side == 'B' and cell == 'Ⓐ':
+        return True
+        
+    # 'A', 'B', 'a', 'b', nuestra comida de cola ('Ⓐ' si somos A), etc.
     return False
 
 from collections import deque
 
-def bfs_distances(grid, start_r, start_c, target_digit=None):
+def bfs_distances(grid, start_r, start_c, side=None, target_digit=None):
     """
     [TEORIA] Búsqueda en Anchura (BFS - Breadth-First Search)
     Calcula la distancia real (en cantidad de pasos) desde (start_r, start_c)
     hasta todas las casillas alcanzables en el mapa, esquivando obstáculos.
     Devuelve un diccionario {(r, c): distancia}.
     """
-    if not is_safe(grid, start_r, start_c, target_digit):
+    if not is_safe(grid, start_r, start_c, side, target_digit):
         return {}
         
     distances = {(start_r, start_c): 0}
@@ -145,13 +158,13 @@ def bfs_distances(grid, start_r, start_c, target_digit=None):
         
         for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             nr, nc = curr_r + dr, curr_c + dc
-            if is_safe(grid, nr, nc, target_digit) and (nr, nc) not in distances:
+            if is_safe(grid, nr, nc, side, target_digit) and (nr, nc) not in distances:
                 distances[(nr, nc)] = curr_dist + 1
                 queue.append((nr, nc))
                 
     return distances
 
-def bfs_safe_area(grid, start_r, start_c, opponent_distances, target_digit=None):
+def bfs_safe_area(grid, start_r, start_c, opponent_distances, side=None, target_digit=None):
     """
     [TEORIA] Control de Territorio y Área Segura
     Calcula cuántas casillas de espacio libre real tenemos si empezamos a caminar 
@@ -159,7 +172,7 @@ def bfs_safe_area(grid, start_r, start_c, opponent_distances, target_digit=None)
     oponente puede llegar antes o al mismo tiempo que nosotros.
     Esto evita que nos encierren.
     """
-    if not is_safe(grid, start_r, start_c, target_digit):
+    if not is_safe(grid, start_r, start_c, side, target_digit):
         return 0
         
     visited = {(start_r, start_c)}
@@ -179,7 +192,7 @@ def bfs_safe_area(grid, start_r, start_c, opponent_distances, target_digit=None)
         
         for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             nr, nc = curr_r + dr, curr_c + dc
-            if is_safe(grid, nr, nc, target_digit) and (nr, nc) not in visited:
+            if is_safe(grid, nr, nc, side, target_digit) and (nr, nc) not in visited:
                 visited.add((nr, nc))
                 queue.append((nr, nc, my_dist + 1))
                 
@@ -190,7 +203,7 @@ def get_next_snake_move(board_str, side, multiplier=1):
     if not grid:
         return 'up'
         
-    head_a, head_b, powerups, digits_dict, length_a, length_b = find_positions(grid)
+    head_a, head_b, powerups, digits_dict, length_a, length_b, tail_food_a, tail_food_b = find_positions(grid)
     target_digit = get_target_digit(digits_dict)
     
     my_head = head_a if side == 'A' else head_b
@@ -203,12 +216,13 @@ def get_next_snake_move(board_str, side, multiplier=1):
         
     r, c = my_head
     
+    opp_side = 'B' if side == 'A' else 'A'
     opp_distances = {}
     if opp_head:
         for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             nr, nc = opp_head[0] + dr, opp_head[1] + dc
-            if is_safe(grid, nr, nc, target_digit):
-                sub_dists = bfs_distances(grid, nr, nc, target_digit)
+            if is_safe(grid, nr, nc, opp_side, target_digit):
+                sub_dists = bfs_distances(grid, nr, nc, opp_side, target_digit)
                 for pos, dist in sub_dists.items():
                     actual_dist = dist + 1
                     if pos not in opp_distances or actual_dist < opp_distances[pos]:
@@ -229,7 +243,7 @@ def get_next_snake_move(board_str, side, multiplier=1):
     # y calculamos un "deseo" general para cada objetivo
     
     for direction, (nr, nc) in moves.items():
-        if is_safe(grid, nr, nc, target_digit):
+        if is_safe(grid, nr, nc, side, target_digit):
             penalty = 0
             if opp_head and abs(nr - opp_head[0]) + abs(nc - opp_head[1]) == 1:
                 # Si el oponente es más grande o igual, un choque de cabezas nos matará o empatará. Evitar si es posible.
@@ -243,8 +257,8 @@ def get_next_snake_move(board_str, side, multiplier=1):
                 if 0 <= wr < len(grid) and 0 <= wc < len(grid[0]) and grid[wr][wc] == '#':
                     penalty += 100 # Pequeña penalización por estar al lado de un muro que se encoge
                 
-            area = bfs_safe_area(grid, nr, nc, opp_distances, target_digit)
-            my_dists = bfs_distances(grid, nr, nc, target_digit)
+            area = bfs_safe_area(grid, nr, nc, opp_distances, side, target_digit)
+            my_dists = bfs_distances(grid, nr, nc, side, target_digit)
             
             # Evaluación equilibrada de objetivos
             best_obj_score = -float('inf')
@@ -284,6 +298,21 @@ def get_next_snake_move(board_str, side, multiplier=1):
                     # Si él llega a su copia antes de que nosotros a la nuestra, abandonamos este objetivo, porque lo robará.
                     if my_dist_to_food <= min_opp_dist_to_any_food:
                         score = food_base_value / (my_dist_to_food + 1)
+                        if score > best_obj_score:
+                            best_obj_score = score
+                            
+            # Evaluamos Comida de Cola del Oponente (v7)
+            # Valor bajo (no escala con multiplicador), para agarrarla solo si está muy cerca o de paso.
+            tail_food_base_value = 100.0
+            opp_tail_foods = tail_food_b if side == 'A' else tail_food_a
+            
+            for tf in opp_tail_foods:
+                if tf in my_dists:
+                    my_dist_to_tf = my_dists[tf]
+                    opp_dist_to_tf = opp_distances.get(tf, float('inf'))
+                    
+                    if my_dist_to_tf <= opp_dist_to_tf:
+                        score = tail_food_base_value / (my_dist_to_tf + 1)
                         if score > best_obj_score:
                             best_obj_score = score
             
